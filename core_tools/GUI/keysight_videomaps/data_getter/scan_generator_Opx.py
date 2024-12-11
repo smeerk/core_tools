@@ -49,339 +49,6 @@ DIVIDER = float
 
 logger = logging.getLogger(__name__)
 
-class OpxFastScanParameter(FastScanParameterBase):
-    def __init__(
-            self,
-            program: Program,
-            video_mode: VideoMode,
-            ):
-        """
-        args:
-            pulse_lib (pulselib): pulse library object
-            pulse_sequence (sequencer) : sequence of the 1D scan
-        """
-        self.video_mode = video_mode
-        self.program = program
-        self._recompile_requested = False
-
-    def recompile(self):
-        self._recompile_requested = True
-
-    def get_channel_data(self) -> dict[str, np.ndarray]:
-        """Starts scan and retrieves data.
-
-        Returns:
-            dictionary with per channel real or complex data in 1D ndarray.
-        """
-        if self._recompile_requested:
-            self._recompile_requested = False
-            start = time.perf_counter()
-            self.video_mode.update_parameters()
-            duration = time.perf_counter() - start
-            logger.info(f"Recompiled in {duration*1000:.1f} ms")
-
-        start = time.perf_counter()
-        # play sequence
-        job = self.video_mode.execute(program)
-        res = job.result_handles
-        logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
-        raw = res.adc_results.fetch_all()
-
-        return raw
-    
-    def close(self):
-        if self.my_seq is not None and self.pulse_lib is not None:
-            logger.debug('stop: release memory')
-            # remove pulse sequence from the AWG's memory, unload schedule and free memory.
-            self.my_seq.close()
-            self.my_seq = None
-            self.pulse_lib = None
-
-    def __del__(self):
-        if self.my_seq is not None and self.pulse_lib is not None:
-            logger.debug('Cleanup in __del__(); Please, call m_param.close() on measurement parameter!')
-            self.close()
-
-class FastScanGenerator(FastScanGeneratorBase):
-
-    def __init__(
-        self,
-        gates: Dict[NAME, tuple[CONTROLLER, INPUT, DIVIDER]],
-        virtual_gates: Dict[NAME, list] = None,
-        resonators: Dict[
-            NAME,
-            tuple[
-                CONTROLLER,
-                INPUT,
-                OUTPUT,
-                FREQUENCY,
-                READOUT_AMPLITUDE,
-                INTEGRATIONS_WEIGHTS_ANGLE,
-            ],
-        ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
-        resonator_time_of_flight: int = 400,
-        qm=None,  # TODO add type
-        testing=True,
-        wait_before_acq=500,
-    ):
-        self.resonators = resonators
-        self.machine = make_quam(
-            gates, virtual_gates, resonators, resonator_time_of_flight
-        )
-
-        self.qm = qm
-        self.gates = gates
-        self.dividers = [gate[2] for gate in gates.values()]
-        self.virtual_gates = virtual_gates
-        self.testing = testing
-        self.wait_before_acq = wait_before_acq
-
-    def create_1D_scan(
-        self,
-        virtual_gate: str,
-        swing: float,
-        n_pt: int,
-        t_measure: float,
-        pulse_gates: dict[str, float] = {},
-        biasT_corr: bool = False,
-    ) -> FastScanParameterBase:
-        """Creates 1D fast scan parameter.
-
-        Args:
-            virtual_gate: virtual gates to sweep.
-            swing: swing to apply on the OPX gate. [mV]
-            n_pt: number of points to measure
-            t_measure: time in ns to measure per point. [ns]
-            pulse_gates:
-                Gates to pulse during scan with pulse voltage in mV.
-                E.g. {'vP1': 10.0, 'vB2': -29.1}
-            biasT_corr: correct for biasT by taking data in different order.
-
-        Returns:
-            Parameter that can be used as input in a scan/measurement functions.
-        """
-        logger.info(f'Create 1D Scan: {virtual_gate}')
-
-        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate])
-        self.setup_measurements(t_measure)
-
-        with qua.program() as program:
-            point_counter = qua.declare(int)
-            self.results_streams = self.declare_streams()
-
-            if not self.testing:
-                self.video_mode.declare_variables()
-
-            with qua.infinite_loop_():
-
-                with qua.for_(
-                    point_counter, 0, point_counter < n_pt, point_counter + 1
-                ):
-                    if self.testing:
-                        self.set_gates_dc(
-                            [
-                                self.video_mode_dummy_params[f"big_step_{gate}"]
-                                + qua.Cast.mul_fixed_by_int(
-                                    self.video_mode_dummy_params[f"small_step_{gate}"],
-                                    point_counter,
-                                )
-                                for gate in self.gates
-                            ]
-                        )
-                    else:
-                        self.set_gates_dc(
-                            [
-                                self.video_mode[f"big_step_{gate}"]
-                                + qua.Cast.mul_fixed_by_int(
-                                    self.video_mode[f"small_step_{gate}"], point_counter
-                                )
-                                for gate in self.gates
-                            ]
-                        )
-                    self.measurement_macro()
-
-                self.set_gates_dc([0 for _ in self.gates])
-
-            with qua.stream_processing():
-                for stream_name, stream in self.results_streams.items():
-                    stream.save_all(stream_name)
-
-        if self.testing:
-            return program
-        
-        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
-
-    def set_gates_dc(self, gate_vals):
-        for gate_name, gate_val in zip(self.machine.gates, gate_vals):
-            qua.set_dc_offset(gate_name, "single", gate_val)
-
-    def play_gates(self, gate_vals):
-        for gate_name, gate_val in zip(self.machine.gates, gate_vals):
-            qua.play(pulses.ConstantPulse(gate_val), self.machine.gates[gate_name])
-
-    def setup_video_mode_1d(
-        self, qm, swing, n_pt, virtual_gates, dimension: int = 1
-    ) -> VideoMode:
-        params_dict = {}
-
-        if dimension == 1:
-            big_step, small_step = calc_steps_1d(
-                swing, n_pt, virtual_gates, self.dividers
-            )
-            for i, gate in enumerate(self.gates):
-                params_dict[f"big_step_{gate}"] = big_step[i]
-                params_dict[f"small_step_{gate}"] = small_step[i]
-        else:
-            raise ("only 1D")
-
-        if self.testing:
-            self.video_mode_dummy_params = params_dict
-
-        return VideoMode(qm, params_dict)
-    
-    def setup_video_mode_2d(
-        self, qm, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dimension: int = 2
-    ) -> VideoMode:
-        params_dict = {}
-
-        if dimension == 2:
-            big_step1, big_step2, small_step1, small_step2 = calc_steps_2d(
-                swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, self.dividers
-            )
-            for i, gate in enumerate(self.gates):
-                params_dict[f"big_step1_{gate}"] = big_step1[i]
-                params_dict[f"big_step2_{gate}"] = big_step2[i]
-                params_dict[f"small_step1_{gate}"] = small_step1[i]
-                params_dict[f"small_step2_{gate}"] = small_step2[i]
-        else:
-            raise ("only 2D")
-
-        if self.testing:
-            self.video_mode_dummy_params = params_dict
-
-        return VideoMode(qm, params_dict)
-
-    def calc_steps_1d(swing, n_pt, virtual_gate, dividers):
-        value = swing * np.array(virtual_gate) * dividers
-        if (np.abs(value) > 2).any():
-            raise ("steps are too large")
-        big_step = -value
-        small_step = 2 * value / (n_pt - 1)
-        return big_step, small_step
-
-
-    def calc_steps_2d(swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
-        value1 = swing1 * np.array(virtual_gate1) * dividers
-        value2 = swing2 * np.array(virtual_gate2) * dividers
-        if (np.abs(value1) > 2).any() or (np.abs(value2) > 2).any():
-            raise ("steps are too large")
-        big_step1 = -value1
-        big_step2 = -value2
-        small_step1 = 2 * value1 / (n_pt1 - 1)
-        small_step2 = 2 * value2 / (n_pt2 - 1)
-        return big_step1, big_step2, small_step1, small_step2
-
-    def setup_measurements(self, t_step: float):
-        for resonator, resonator_items in self.resonators.items():
-            (
-                controller,
-                resonator_input,
-                resonator_output,
-                frequency,
-                readout_amplitude,
-                integration_weights_angle,
-            ) = resonator_items
-
-            self.machine.resonators[resonator].operations["readout"] = (
-                pulses.ConstantReadoutPulse(
-                    length=t_step,  # TODO not necessarily just t_step if theres a wait before acquisition.
-                    amplitude=readout_amplitude,
-                    integration_weights_angle=integration_weights_angle,
-                )
-            )
-
-    def declare_streams(
-        self,
-    ):
-        result_streams = {}
-        for resonator in self.machine.resonators.values():
-            result_streams[f"{resonator.id}_I"] = qua.declare_stream()
-
-        return result_streams
-
-    def measurement_macro(
-        self,
-    ):
-        if self.wait_before_acq >= 16:
-            qua.wait(self.wait_before_acq // 4, *self.machine.resonators)
-        for res_name, resonator in self.machine.resonators.items():
-            I_val, Q_val = resonator.measure("readout")
-            qua.save(I_val, self.results_streams[f"{res_name}_I"])
-
-
-#region QuAM
-@quam_dataclass
-class QuAM(QuamRoot):
-    gates: Dict[str, SingleChannel] = field(default_factory=dict)
-    resonators: Dict[str, InOutSingleChannel] = field(default_factory=dict)
-    slow_VirtualGateSet: VirtualGateSet = None
-    fast_VirtualGateSet: VirtualGateSet = None
-
-    def align_all(self):
-        qua.align(*self.resonators, *self.gates)
-
-
-def add_gate(machine, gate_name, opx_output, controller):
-    machine.gates[gate_name] = SingleChannel(
-        id=gate_name,
-        opx_output=(controller, opx_output),
-        sticky=StickyChannelAddon(duration=200, digital=False),
-    )
-
-    machine.gates[gate_name].operations["CW"] = pulses.SquarePulse(
-        amplitude=0.25, length=1000
-    )
-    return machine
-
-
-def make_quam(
-    gates: Dict[NAME, tuple[CONTROLLER, INPUT, DIVIDER]],
-    virtual_gates: Dict[NAME, list] = None,
-    resonators: Dict[
-        NAME,
-        tuple[
-            CONTROLLER,
-            INPUT,
-            OUTPUT,
-            FREQUENCY,
-            READOUT_AMPLITUDE,
-            INTEGRATIONS_WEIGHTS_ANGLE,
-        ],
-    ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
-    resonator_time_of_flight: int = 400,
-):
-
-    # print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
-    machine = QuAM()
-    machine.gates = {}
-    for gate_name, output in gates.items():
-        controller, opx_output, _ = output
-        add_gate(machine, gate_name, opx_output, controller=controller)
-
-    for resonator_name, resonator_items in resonators.items():
-        controller, resonator_input, resonator_output, frequency, _, _ = resonator_items
-
-        machine.resonators[resonator_name] = InOutSingleChannel(
-            id=resonator_name,
-            opx_output=(controller, resonator_input),
-            opx_input=(controller, resonator_output),
-            intermediate_frequency=frequency,
-            time_of_flight=resonator_time_of_flight,
-        )
-
-    return machine
-
-
 #region QM-VideoMode
 
 
@@ -864,3 +531,341 @@ class VideoMode:
         Returns the QUA variable corresponding to the parameter name.
         """
         return self._parameter_table[item]
+
+#region QuAM
+@quam_dataclass
+class QuAM(QuamRoot):
+    gates: Dict[str, SingleChannel] = field(default_factory=dict)
+    resonators: Dict[str, InOutSingleChannel] = field(default_factory=dict)
+    slow_VirtualGateSet: VirtualGateSet = None
+    fast_VirtualGateSet: VirtualGateSet = None
+
+    def align_all(self):
+        qua.align(*self.resonators, *self.gates)
+
+
+def add_gate(machine, gate_name, opx_output, controller):
+    machine.gates[gate_name] = SingleChannel(
+        id=gate_name,
+        opx_output=(controller, opx_output),
+        sticky=StickyChannelAddon(duration=200, digital=False),
+    )
+
+    machine.gates[gate_name].operations["CW"] = pulses.SquarePulse(
+        amplitude=0.25, length=1000
+    )
+    return machine
+
+
+def make_quam(
+    gates: Dict[NAME, tuple[CONTROLLER, INPUT, DIVIDER]],
+    virtual_gates: Dict[NAME, list] = None,
+    resonators: Dict[
+        NAME,
+        tuple[
+            CONTROLLER,
+            INPUT,
+            OUTPUT,
+            FREQUENCY,
+            READOUT_AMPLITUDE,
+            INTEGRATIONS_WEIGHTS_ANGLE,
+        ],
+    ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
+    resonator_time_of_flight: int = 400,
+):
+
+    # print("DIVIDERS SHOULD NOT BE APPLIED TO VIRTUAL GATES ALREADY!!!")
+    machine = QuAM()
+    machine.gates = {}
+    for gate_name, output in gates.items():
+        controller, opx_output, _ = output
+        add_gate(machine, gate_name, opx_output, controller=controller)
+
+    for resonator_name, resonator_items in resonators.items():
+        controller, resonator_input, resonator_output, frequency, _, _ = resonator_items
+
+        machine.resonators[resonator_name] = InOutSingleChannel(
+            id=resonator_name,
+            opx_output=(controller, resonator_input),
+            opx_input=(controller, resonator_output),
+            intermediate_frequency=frequency,
+            time_of_flight=resonator_time_of_flight,
+        )
+
+    return machine
+
+#endregion
+
+#region FastScanGenerator
+
+class OpxFastScanParameter(FastScanParameterBase):
+    def __init__(
+            self,
+            program: Program,
+            video_mode: VideoMode,
+            ):
+        """
+        args:
+            pulse_lib (pulselib): pulse library object
+            pulse_sequence (sequencer) : sequence of the 1D scan
+        """
+        self.video_mode = video_mode
+        self.program = program
+        self._recompile_requested = False
+
+    def recompile(self):
+        self._recompile_requested = True
+
+    def get_channel_data(self) -> dict[str, np.ndarray]:
+        """Starts scan and retrieves data.
+
+        Returns:
+            dictionary with per channel real or complex data in 1D ndarray.
+        """
+        if self._recompile_requested:
+            self._recompile_requested = False
+            start = time.perf_counter()
+            self.video_mode.update_parameters()
+            duration = time.perf_counter() - start
+            logger.info(f"Recompiled in {duration*1000:.1f} ms")
+
+        start = time.perf_counter()
+        # play sequence
+        job = self.video_mode.execute(program)
+        res = job.result_handles
+        logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
+        raw = res.adc_results.fetch_all()
+
+        return raw
+    
+    def close(self):
+        if self.my_seq is not None and self.pulse_lib is not None:
+            logger.debug('stop: release memory')
+            # remove pulse sequence from the AWG's memory, unload schedule and free memory.
+            self.my_seq.close()
+            self.my_seq = None
+            self.pulse_lib = None
+
+    def __del__(self):
+        if self.my_seq is not None and self.pulse_lib is not None:
+            logger.debug('Cleanup in __del__(); Please, call m_param.close() on measurement parameter!')
+            self.close()
+
+class FastScanGenerator(FastScanGeneratorBase):
+
+    def __init__(
+        self,
+        gates: Dict[NAME, tuple[CONTROLLER, INPUT, DIVIDER]],
+        virtual_gates: Dict[NAME, list] = None,
+        resonators: Dict[
+            NAME,
+            tuple[
+                CONTROLLER,
+                INPUT,
+                OUTPUT,
+                FREQUENCY,
+                READOUT_AMPLITUDE,
+                INTEGRATIONS_WEIGHTS_ANGLE,
+            ],
+        ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
+        resonator_time_of_flight: int = 400,
+        qm=None,  # TODO add type
+        testing=True,
+        wait_before_acq=500,
+    ):
+        self.resonators = resonators
+        self.machine = make_quam(
+            gates, virtual_gates, resonators, resonator_time_of_flight
+        )
+
+        self.qm = qm
+        self.gates = gates
+        self.dividers = [gate[2] for gate in gates.values()]
+        self.virtual_gates = virtual_gates
+        self.testing = testing
+        self.wait_before_acq = wait_before_acq
+
+    def create_1D_scan(
+        self,
+        virtual_gate: str,
+        swing: float,
+        n_pt: int,
+        t_measure: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> FastScanParameterBase:
+        """Creates 1D fast scan parameter.
+
+        Args:
+            virtual_gate: virtual gates to sweep.
+            swing: swing to apply on the OPX gate. [mV]
+            n_pt: number of points to measure
+            t_measure: time in ns to measure per point. [ns]
+            pulse_gates:
+                Gates to pulse during scan with pulse voltage in mV.
+                E.g. {'vP1': 10.0, 'vB2': -29.1}
+            biasT_corr: correct for biasT by taking data in different order.
+
+        Returns:
+            Parameter that can be used as input in a scan/measurement functions.
+        """
+        logger.info(f'Create 1D Scan: {virtual_gate}')
+
+        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate])
+        self.setup_measurements(t_measure)
+
+        with qua.program() as program:
+            point_counter = qua.declare(int)
+            self.results_streams = self.declare_streams()
+
+            if not self.testing:
+                self.video_mode.declare_variables()
+
+            with qua.infinite_loop_():
+
+                with qua.for_(
+                    point_counter, 0, point_counter < n_pt, point_counter + 1
+                ):
+                    if self.testing:
+                        self.set_gates_dc(
+                            [
+                                self.video_mode_dummy_params[f"big_step_{gate}"]
+                                + qua.Cast.mul_fixed_by_int(
+                                    self.video_mode_dummy_params[f"small_step_{gate}"],
+                                    point_counter,
+                                )
+                                for gate in self.gates
+                            ]
+                        )
+                    else:
+                        self.set_gates_dc(
+                            [
+                                self.video_mode[f"big_step_{gate}"]
+                                + qua.Cast.mul_fixed_by_int(
+                                    self.video_mode[f"small_step_{gate}"], point_counter
+                                )
+                                for gate in self.gates
+                            ]
+                        )
+                    self.measurement_macro()
+
+                self.set_gates_dc([0 for _ in self.gates])
+
+            with qua.stream_processing():
+                for stream_name, stream in self.results_streams.items():
+                    stream.save_all(stream_name)
+
+        if self.testing:
+            return program
+        
+        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
+
+    def set_gates_dc(self, gate_vals):
+        for gate_name, gate_val in zip(self.machine.gates, gate_vals):
+            qua.set_dc_offset(gate_name, "single", gate_val)
+
+    def play_gates(self, gate_vals):
+        for gate_name, gate_val in zip(self.machine.gates, gate_vals):
+            qua.play(pulses.ConstantPulse(gate_val), self.machine.gates[gate_name])
+
+    def setup_video_mode_1d(
+        self, qm, swing, n_pt, virtual_gates, dimension: int = 1
+    ) -> VideoMode:
+        params_dict = {}
+
+        if dimension == 1:
+            big_step, small_step = calc_steps_1d(
+                swing, n_pt, virtual_gates, self.dividers
+            )
+            for i, gate in enumerate(self.gates):
+                params_dict[f"big_step_{gate}"] = big_step[i]
+                params_dict[f"small_step_{gate}"] = small_step[i]
+        else:
+            raise ("only 1D")
+
+        if self.testing:
+            self.video_mode_dummy_params = params_dict
+
+        return VideoMode(qm, params_dict)
+    
+    def setup_video_mode_2d(
+        self, qm, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dimension: int = 2
+    ) -> VideoMode:
+        params_dict = {}
+
+        if dimension == 2:
+            big_step1, big_step2, small_step1, small_step2 = calc_steps_2d(
+                swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, self.dividers
+            )
+            for i, gate in enumerate(self.gates):
+                params_dict[f"big_step1_{gate}"] = big_step1[i]
+                params_dict[f"big_step2_{gate}"] = big_step2[i]
+                params_dict[f"small_step1_{gate}"] = small_step1[i]
+                params_dict[f"small_step2_{gate}"] = small_step2[i]
+        else:
+            raise ("only 2D")
+
+        if self.testing:
+            self.video_mode_dummy_params = params_dict
+
+        return VideoMode(qm, params_dict)
+
+    def calc_steps_1d(swing, n_pt, virtual_gate, dividers):
+        value = swing * np.array(virtual_gate) * dividers
+        if (np.abs(value) > 2).any():
+            raise ("steps are too large")
+        big_step = -value
+        small_step = 2 * value / (n_pt - 1)
+        return big_step, small_step
+
+
+    def calc_steps_2d(swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
+        value1 = swing1 * np.array(virtual_gate1) * dividers
+        value2 = swing2 * np.array(virtual_gate2) * dividers
+        if (np.abs(value1) > 2).any() or (np.abs(value2) > 2).any():
+            raise ("steps are too large")
+        big_step1 = -value1
+        big_step2 = -value2
+        small_step1 = 2 * value1 / (n_pt1 - 1)
+        small_step2 = 2 * value2 / (n_pt2 - 1)
+        return big_step1, big_step2, small_step1, small_step2
+
+    def setup_measurements(self, t_step: float):
+        for resonator, resonator_items in self.resonators.items():
+            (
+                controller,
+                resonator_input,
+                resonator_output,
+                frequency,
+                readout_amplitude,
+                integration_weights_angle,
+            ) = resonator_items
+
+            self.machine.resonators[resonator].operations["readout"] = (
+                pulses.ConstantReadoutPulse(
+                    length=t_step,  # TODO not necessarily just t_step if theres a wait before acquisition.
+                    amplitude=readout_amplitude,
+                    integration_weights_angle=integration_weights_angle,
+                )
+            )
+
+    def declare_streams(
+        self,
+    ):
+        result_streams = {}
+        for resonator in self.machine.resonators.values():
+            result_streams[f"{resonator.id}_I"] = qua.declare_stream()
+
+        return result_streams
+
+    def measurement_macro(
+        self,
+    ):
+        if self.wait_before_acq >= 16:
+            qua.wait(self.wait_before_acq // 4, *self.machine.resonators)
+        for res_name, resonator in self.machine.resonators.items():
+            I_val, Q_val = resonator.measure("readout")
+            qua.save(I_val, self.results_streams[f"{res_name}_I"])
+
+
+
