@@ -1,4 +1,4 @@
-from core_tools.data.SQL.connector import set_up_local_storage,\
+from core_tools.data.SQL.connect import set_up_local_storage,\
 	set_up_remote_storage, set_up_local_and_remote_storage
 
 ##################################################
