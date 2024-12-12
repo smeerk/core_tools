@@ -670,7 +670,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
         resonator_time_of_flight: int = 400,
         qm=None,  # TODO add type
-        testing=True,
+        testing=bool | False,
         wait_before_acq=500,
     ):
         self.resonators = resonators
