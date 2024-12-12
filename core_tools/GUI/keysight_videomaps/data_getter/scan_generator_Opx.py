@@ -714,13 +714,13 @@ class FastScanGenerator(FastScanGeneratorBase):
         return big_step1, big_step2, small_step1, small_step2
 
     def setup_video_mode_1d(
-        self, qm, swing, n_pt, virtual_gates, dimension: int = 1
+        self, qm, swing, n_pt, virtual_gates, dividers, dimension: int = 1
     ) -> VideoMode:
         params_dict = {}
 
         if dimension == 1:
             big_step, small_step = self.calc_steps_1d(
-                swing, n_pt, virtual_gates, self.dividers
+                swing, n_pt, virtual_gates, dividers
             )
             for i, gate in enumerate(self.gates):
                 params_dict[f"big_step_{gate}"] = big_step[i]
@@ -734,13 +734,13 @@ class FastScanGenerator(FastScanGeneratorBase):
         return VideoMode(qm, params_dict)
     
     def setup_video_mode_2d(
-        self, qm, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dimension: int = 2
+        self, qm, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers, dimension: int = 2
     ) -> VideoMode:
         params_dict = {}
 
         if dimension == 2:
             big_step1, big_step2, small_step1, small_step2 = self.calc_steps_2d(
-                swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, self.dividers
+                swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers
             )
             for i, gate in enumerate(self.gates):
                 params_dict[f"big_step1_{gate}"] = big_step1[i]
@@ -818,7 +818,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         """
         logger.info(f'Create 1D Scan: {virtual_gate}')
 
-        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate])
+        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
         self.setup_measurements(t_measure)
 
         with qua.program() as program:
@@ -882,7 +882,7 @@ class FastScanGenerator(FastScanGeneratorBase):
     ) -> FastScanParameterBase:
         
         self.video_mode = self.setup_video_mode_2d(
-            self.qm, swing1, n_pt1, swing2, n_pt2, self.virtual_gates[virtual_gate1], self.virtual_gates[virtual_gate2], dimension=2
+            self.qm, swing1, n_pt1, swing2, n_pt2, self.virtual_gates[virtual_gate1], self.virtual_gates[virtual_gate2], self.dividers, dimension=2
         )
         self.setup_measurements(t_measure)
 
