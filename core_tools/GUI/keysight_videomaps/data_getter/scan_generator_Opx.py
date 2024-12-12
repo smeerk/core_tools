@@ -719,7 +719,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         params_dict = {}
 
         if dimension == 1:
-            big_step, small_step = calc_steps_1d(
+            big_step, small_step = self.calc_steps_1d(
                 swing, n_pt, virtual_gates, self.dividers
             )
             for i, gate in enumerate(self.gates):
@@ -739,7 +739,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         params_dict = {}
 
         if dimension == 2:
-            big_step1, big_step2, small_step1, small_step2 = calc_steps_2d(
+            big_step1, big_step2, small_step1, small_step2 = self.calc_steps_2d(
                 swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, self.dividers
             )
             for i, gate in enumerate(self.gates):
