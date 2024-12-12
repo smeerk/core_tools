@@ -693,6 +693,26 @@ class FastScanGenerator(FastScanGeneratorBase):
         for gate_name, gate_val in zip(self.machine.gates, gate_vals):
             qua.play(pulses.ConstantPulse(gate_val), self.machine.gates[gate_name])
 
+    def calc_steps_1d(swing, n_pt, virtual_gate, dividers):
+        value = swing * np.array(virtual_gate) * dividers
+        if (np.abs(value) > 2).any():
+            raise ("steps are too large")
+        big_step = -value
+        small_step = 2 * value / (n_pt - 1)
+        return big_step, small_step
+
+
+    def calc_steps_2d(swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
+        value1 = swing1 * np.array(virtual_gate1) * dividers
+        value2 = swing2 * np.array(virtual_gate2) * dividers
+        if (np.abs(value1) > 2).any() or (np.abs(value2) > 2).any():
+            raise ("steps are too large")
+        big_step1 = -value1
+        big_step2 = -value2
+        small_step1 = 2 * value1 / (n_pt1 - 1)
+        small_step2 = 2 * value2 / (n_pt2 - 1)
+        return big_step1, big_step2, small_step1, small_step2
+
     def setup_video_mode_1d(
         self, qm, swing, n_pt, virtual_gates, dimension: int = 1
     ) -> VideoMode:
@@ -734,26 +754,6 @@ class FastScanGenerator(FastScanGeneratorBase):
             self.video_mode_dummy_params = params_dict
 
         return VideoMode(qm, params_dict)
-
-    def calc_steps_1d(swing, n_pt, virtual_gate, dividers):
-        value = swing * np.array(virtual_gate) * dividers
-        if (np.abs(value) > 2).any():
-            raise ("steps are too large")
-        big_step = -value
-        small_step = 2 * value / (n_pt - 1)
-        return big_step, small_step
-
-
-    def calc_steps_2d(swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
-        value1 = swing1 * np.array(virtual_gate1) * dividers
-        value2 = swing2 * np.array(virtual_gate2) * dividers
-        if (np.abs(value1) > 2).any() or (np.abs(value2) > 2).any():
-            raise ("steps are too large")
-        big_step1 = -value1
-        big_step2 = -value2
-        small_step1 = 2 * value1 / (n_pt1 - 1)
-        small_step2 = 2 * value2 / (n_pt2 - 1)
-        return big_step1, big_step2, small_step1, small_step2
 
     def setup_measurements(self, t_step: float):
         for resonator, resonator_items in self.resonators.items():
