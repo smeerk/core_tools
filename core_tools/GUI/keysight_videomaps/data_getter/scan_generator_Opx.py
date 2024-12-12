@@ -601,6 +601,7 @@ def make_quam(
 class OpxFastScanParameter(FastScanParameterBase):
     def __init__(
             self,
+            pulse_lib,
             program: Program,
             video_mode: VideoMode,
             ):
@@ -609,6 +610,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             pulse_lib (pulselib): pulse library object
             pulse_sequence (sequencer) : sequence of the 1D scan
         """
+        self.pulse_lib = pulse_lib
         self.video_mode = video_mode
         self.program = program
         self._recompile_requested = False
@@ -865,7 +867,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
+        return OpxFastScanParameter(program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
@@ -939,4 +941,4 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
+        return OpxFastScanParameter(program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
