@@ -685,81 +685,6 @@ class FastScanGenerator(FastScanGeneratorBase):
         self.testing = testing
         self.wait_before_acq = wait_before_acq
 
-    def create_1D_scan(
-        self,
-        virtual_gate: str,
-        swing: float,
-        n_pt: int,
-        t_measure: float,
-        pulse_gates: dict[str, float] = {},
-        biasT_corr: bool = False,
-    ) -> FastScanParameterBase:
-        """Creates 1D fast scan parameter.
-
-        Args:
-            virtual_gate: virtual gates to sweep.
-            swing: swing to apply on the OPX gate. [mV]
-            n_pt: number of points to measure
-            t_measure: time in ns to measure per point. [ns]
-            pulse_gates:
-                Gates to pulse during scan with pulse voltage in mV.
-                E.g. {'vP1': 10.0, 'vB2': -29.1}
-            biasT_corr: correct for biasT by taking data in different order.
-
-        Returns:
-            Parameter that can be used as input in a scan/measurement functions.
-        """
-        logger.info(f'Create 1D Scan: {virtual_gate}')
-
-        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate])
-        self.setup_measurements(t_measure)
-
-        with qua.program() as program:
-            point_counter = qua.declare(int)
-            self.results_streams = self.declare_streams()
-
-            if not self.testing:
-                self.video_mode.declare_variables()
-
-            with qua.infinite_loop_():
-
-                with qua.for_(
-                    point_counter, 0, point_counter < n_pt, point_counter + 1
-                ):
-                    if self.testing:
-                        self.set_gates_dc(
-                            [
-                                self.video_mode_dummy_params[f"big_step_{gate}"]
-                                + qua.Cast.mul_fixed_by_int(
-                                    self.video_mode_dummy_params[f"small_step_{gate}"],
-                                    point_counter,
-                                )
-                                for gate in self.gates
-                            ]
-                        )
-                    else:
-                        self.set_gates_dc(
-                            [
-                                self.video_mode[f"big_step_{gate}"]
-                                + qua.Cast.mul_fixed_by_int(
-                                    self.video_mode[f"small_step_{gate}"], point_counter
-                                )
-                                for gate in self.gates
-                            ]
-                        )
-                    self.measurement_macro()
-
-                self.set_gates_dc([0 for _ in self.gates])
-
-            with qua.stream_processing():
-                for stream_name, stream in self.results_streams.items():
-                    stream.save_all(stream_name)
-
-        if self.testing:
-            return program
-        
-        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
-
     def set_gates_dc(self, gate_vals):
         for gate_name, gate_val in zip(self.machine.gates, gate_vals):
             qua.set_dc_offset(gate_name, "single", gate_val)
@@ -867,5 +792,151 @@ class FastScanGenerator(FastScanGeneratorBase):
             I_val, Q_val = resonator.measure("readout")
             qua.save(I_val, self.results_streams[f"{res_name}_I"])
 
+    def create_1D_scan(
+        self,
+        virtual_gate: str,
+        swing: float,
+        n_pt: int,
+        t_measure: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> FastScanParameterBase:
+        """Creates 1D fast scan parameter.
+
+        Args:
+            virtual_gate: virtual gates to sweep.
+            swing: swing to apply on the OPX gate. [mV]
+            n_pt: number of points to measure
+            t_measure: time in ns to measure per point. [ns]
+            pulse_gates:
+                Gates to pulse during scan with pulse voltage in mV.
+                E.g. {'vP1': 10.0, 'vB2': -29.1}
+            biasT_corr: correct for biasT by taking data in different order.
+
+        Returns:
+            Parameter that can be used as input in a scan/measurement functions.
+        """
+        logger.info(f'Create 1D Scan: {virtual_gate}')
+
+        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate])
+        self.setup_measurements(t_measure)
+
+        with qua.program() as program:
+            point_counter = qua.declare(int)
+            self.results_streams = self.declare_streams()
+
+            if not self.testing:
+                self.video_mode.declare_variables()
+
+            with qua.infinite_loop_():
+
+                with qua.for_(
+                    point_counter, 0, point_counter < n_pt, point_counter + 1
+                ):
+                    if self.testing:
+                        self.set_gates_dc(
+                            [
+                                self.video_mode_dummy_params[f"big_step_{gate}"]
+                                + qua.Cast.mul_fixed_by_int(
+                                    self.video_mode_dummy_params[f"small_step_{gate}"],
+                                    point_counter,
+                                )
+                                for gate in self.gates
+                            ]
+                        )
+                    else:
+                        self.set_gates_dc(
+                            [
+                                self.video_mode[f"big_step_{gate}"]
+                                + qua.Cast.mul_fixed_by_int(
+                                    self.video_mode[f"small_step_{gate}"], point_counter
+                                )
+                                for gate in self.gates
+                            ]
+                        )
+                    self.measurement_macro()
+
+                self.set_gates_dc([0 for _ in self.gates])
+
+            with qua.stream_processing():
+                for stream_name, stream in self.results_streams.items():
+                    stream.save_all(stream_name)
+
+        if self.testing:
+            return program
+        
+        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
 
 
+    def create_2D_scan(
+        self,
+        virtual_gate1: str,
+        swing1: float,
+        n_pt1: int,
+        virtual_gate2: str,
+        swing2: float,
+        n_pt2: int,
+        t_measure: float,
+        pulse_gates: dict[str, float] = {},
+        biasT_corr: bool = False,
+    ) -> FastScanParameterBase:
+        
+        self.video_mode = self.setup_video_mode_2d(
+            self.qm, swing1, n_pt1, swing2, n_pt2, self.virtual_gates[virtual_gate1], self.virtual_gates[virtual_gate2], dimension=2
+        )
+        self.setup_measurements(t_measure)
+
+        with qua.program() as program:
+            point_counter1 = qua.declare(int)
+            point_counter2 = qua.declare(int)
+            self.results_streams = self.declare_streams()
+
+            if not self.testing:
+                self.video_mode.declare_variables()
+
+            with qua.infinite_loop_():
+
+                with qua.for_(
+                    point_counter1, 0, point_counter1 < n_pt1, point_counter1 + 1
+                ):
+                    with qua.for_(
+                        point_counter2, 0, point_counter2 < n_pt2, point_counter2 + 1
+                    ):
+                        if self.testing:
+                            self.set_gates_dc(
+                                [
+                                    self.video_mode_dummy_params[f"big_step1_{gate}"]+self.video_mode_dummy_params[f"big_step2_{gate}"]
+                                    + qua.Cast.mul_fixed_by_int(
+                                        self.video_mode_dummy_params[f"small_step1_{gate}"],
+                                        point_counter1,
+                                    ) + qua.Cast.mul_fixed_by_int(
+                                        self.video_mode_dummy_params[f"small_step2_{gate}"],
+                                        point_counter2,
+                                    )
+                                    for gate in self.gates
+                                ]
+                            )
+                        else:
+                            self.set_gates_dc(
+                                [
+                                    self.video_mode[f"big_step1_{gate}"]+self.video_mode[f"big_step2_{gate}"]
+                                    + qua.Cast.mul_fixed_by_int(
+                                        self.video_mode[f"small_step1_{gate}"], point_counter1
+                                    ) + qua.Cast.mul_fixed_by_int(
+                                        self.video_mode[f"small_step2_{gate}"], point_counter2
+                                    )
+                                    for gate in self.gates
+                                ]
+                            )
+                        self.measurement_macro()
+
+                self.set_gates_dc([0 for _ in self.gates])
+
+            with qua.stream_processing():
+                for stream_name, stream in self.results_streams.items():
+                    stream.save_all(stream_name)
+
+        if self.testing:
+            return program
+        
+        return OpxFastScanParameter(program, self.video_mode) # what should be returned here?
