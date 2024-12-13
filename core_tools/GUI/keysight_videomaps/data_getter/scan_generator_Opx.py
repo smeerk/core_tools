@@ -601,9 +601,9 @@ def make_quam(
 class OpxFastScanParameter(FastScanParameterBase):
     def __init__(
             self,
-            pulse_lib,
             program: Program,
             video_mode: VideoMode,
+            pulse_lib,
             ):
         """
         args:
