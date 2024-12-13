@@ -641,15 +641,13 @@ class OpxFastScanParameter(FastScanParameterBase):
         return raw
     
     def close(self):
-        if self.my_seq is not None and self.pulse_lib is not None:
+        if self.pulse_lib is not None:
             logger.debug('stop: release memory')
             # remove pulse sequence from the AWG's memory, unload schedule and free memory.
-            self.my_seq.close()
-            self.my_seq = None
             self.pulse_lib = None
 
     def __del__(self):
-        if self.my_seq is not None and self.pulse_lib is not None:
+        if self.pulse_lib is not None:
             logger.debug('Cleanup in __del__(); Please, call m_param.close() on measurement parameter!')
             self.close()
 
