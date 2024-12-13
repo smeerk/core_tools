@@ -601,6 +601,7 @@ def make_quam(
 class OpxFastScanParameter(FastScanParameterBase):
     def __init__(
             self,
+            scan_config: ScanConfigBase,
             program: Program,
             video_mode: VideoMode,
             pulse_lib,
@@ -614,6 +615,8 @@ class OpxFastScanParameter(FastScanParameterBase):
         self.video_mode = video_mode
         self.program = program
         self._recompile_requested = False
+
+        super().__init__(scan_config)
 
     def recompile(self):
         self._recompile_requested = True
@@ -818,6 +821,8 @@ class FastScanGenerator(FastScanGeneratorBase):
         """
         logger.info(f'Create 1D Scan: {virtual_gate}')
 
+        config = self.get_config1D(virtual_gate, swing, n_pt, t_measure, pulse_gates, biasT_corr)
+
         self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
         self.setup_measurements(t_measure)
 
@@ -865,7 +870,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
@@ -880,6 +885,11 @@ class FastScanGenerator(FastScanGeneratorBase):
         pulse_gates: dict[str, float] = {},
         biasT_corr: bool = False,
     ) -> FastScanParameterBase:
+        
+        config = self.get_config2D(
+            virtual_gate1, swing1, n_pt1,
+            virtual_gate2, swing2, n_pt2,
+            t_measure, pulse_gates, biasT_corr)
         
         self.video_mode = self.setup_video_mode_2d(
             self.qm, swing1, n_pt1, swing2, n_pt2, self.virtual_gates[virtual_gate1], self.virtual_gates[virtual_gate2], self.dividers, dimension=2
@@ -939,4 +949,4 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
