@@ -698,8 +698,6 @@ class FastScanGenerator(FastScanGeneratorBase):
 
     def calc_steps_1d(self, swing, n_pt, virtual_gate, dividers):
         value = swing * np.array(virtual_gate) * dividers
-        if (np.abs(value) > 2).any():
-            raise ("steps are too large")
         big_step = -value
         small_step = 2 * value / (n_pt - 1)
         return big_step, small_step
@@ -708,8 +706,6 @@ class FastScanGenerator(FastScanGeneratorBase):
     def calc_steps_2d(self, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
         value1 = swing1 * np.array(virtual_gate1) * dividers
         value2 = swing2 * np.array(virtual_gate2) * dividers
-        if (np.abs(value1) > 2).any() or (np.abs(value2) > 2).any():
-            raise ("steps are too large")
         big_step1 = -value1
         big_step2 = -value2
         small_step1 = 2 * value1 / (n_pt1 - 1)
