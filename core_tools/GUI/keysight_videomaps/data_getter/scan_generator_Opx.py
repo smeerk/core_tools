@@ -636,7 +636,7 @@ class OpxFastScanParameter(FastScanParameterBase):
 
         start = time.perf_counter()
         # play sequence
-        job = self.video_mode.execute(program)
+        job = self.video_mode.execute(self.program)
         res = job.result_handles
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
         raw = res.adc_results.fetch_all()
