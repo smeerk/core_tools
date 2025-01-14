@@ -56,13 +56,13 @@ class OPX(Instrument):
         self.connect_dict = connect_dict
         self._connect()
         self.result_handles = None
-        channels = ChannelList(self, 'QuantumElements', QuantumElement,
-                               snapshotable=True)
-        self.add_submodule("channels", channels)
-        for qe in self.config['elements'].keys():
-            channel = QuantumElement(self, qe)
-            self.channels.append(channel)
-            setattr(self, qe, channel)
+        # channels = ChannelList(self, 'QuantumElements', QuantumElement,
+        #                        snapshotable=True)
+        # self.add_submodule("channels", channels)
+        # for qe in self.config['elements'].keys():
+        #     channel = QuantumElement(self, qe)
+        #     self.channels.append(channel)
+        #     setattr(self, qe, channel)
 
     def execute_prog(self, prog):
         self.job = self.qm.execute(prog)
