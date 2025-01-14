@@ -677,11 +677,13 @@ class FastScanGenerator(FastScanGeneratorBase):
         wait_before_acq=500,
     ):
         self.resonators = resonators
-        self.machine = make_quam(
-            gates, virtual_gates, resonators, resonator_time_of_flight
-        )
+        self.qmm = qmm
+        self.resonator_time_of_flight = resonator_time_of_flight
+        # self.machine = make_quam(
+        #     gates, virtual_gates, resonators, resonator_time_of_flight
+        # )
 
-        self.qm = qmm.open_qm(self.machine.generate_config())
+        # self.qm = qmm.open_qm(self.machine.generate_config())
         self.gates = gates
         self.dividers = [gate[2] for gate in gates.values()]
         self.virtual_gates = virtual_gates
@@ -821,6 +823,12 @@ class FastScanGenerator(FastScanGeneratorBase):
 
         self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
         self.setup_measurements(t_measure)
+
+        self.machine = make_quam(
+            self.gates, self.virtual_gates, self.resonators, self.resonator_time_of_flight
+        )
+
+        self.qm = self.qmm.open_qm(self.machine.generate_config())
 
         with qua.program() as program:
             point_counter = qua.declare(int)
