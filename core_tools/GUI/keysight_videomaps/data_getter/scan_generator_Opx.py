@@ -15,6 +15,7 @@ import numpy.typing as npt
 from qualang_tools.results import fetching_tool
 from qm import QuantumMachinesManager
 from qm import qua
+from qm.qua._dsl import _ResultsStream
 
 # from qm.QuantumMachinesManager import QuantumMachine
 from quam.core import QuamRoot, quam_dataclass
@@ -604,8 +605,8 @@ class OpxFastScanParameter(FastScanParameterBase):
             scan_config: ScanConfigBase,
             program: Program,
             video_mode: VideoMode,
+            results_stream: _ResultsStream,
             pulse_lib,
-            results_stream,
             ):
         """
         args:
@@ -881,7 +882,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.video_mode, results_stream=self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
