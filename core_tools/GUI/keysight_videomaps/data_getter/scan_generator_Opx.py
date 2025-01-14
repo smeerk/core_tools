@@ -604,7 +604,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             scan_config: ScanConfigBase,
             program: Program,
             video_mode: VideoMode,
-            results_stream: _ResultsStream,
+            results_stream,
             pulse_lib,
             ):
         """
@@ -644,6 +644,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         job = self.video_mode.execute(self.program)
         res = job.result_handles
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
+
         for stream_name, stream in self.results_stream.items():
             raw[stream_name] = res.stream_name.fetch_all()
 
@@ -881,7 +882,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.video_mode, self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, results_stream = self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
