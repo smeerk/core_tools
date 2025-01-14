@@ -603,10 +603,9 @@ class OpxFastScanParameter(FastScanParameterBase):
             self,
             scan_config: ScanConfigBase,
             program: Program,
-            results_stream : qua._dsl._ResultSource,
             video_mode: VideoMode,
             pulse_lib,
-            machine,
+            results_stream,
             ):
         """
         args:
@@ -614,7 +613,6 @@ class OpxFastScanParameter(FastScanParameterBase):
             pulse_sequence (sequencer) : sequence of the 1D scan
         """
         self.pulse_lib = pulse_lib
-        self.machine = machine
         self.results_stream = results_stream
         self.video_mode = video_mode
         self.program = program
@@ -632,10 +630,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             dictionary with per channel real or complex data in 1D ndarray.
         """
 
-        stream_names = []
-
-        for res_name, resonator in self.machine.resonators.items():
-            stream_names.append(f"{res_name}_I")
+        raw = {}
 
         if self._recompile_requested:
             self._recompile_requested = False
@@ -649,7 +644,8 @@ class OpxFastScanParameter(FastScanParameterBase):
         job = self.video_mode.execute(self.program)
         res = job.result_handles
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
-        raw = res.stream_names[0].fetch_all()
+        for stream_name, stream in self.results_stream.items():
+            raw[stream_name] = res.stream_name.fetch_all()
 
         return raw
     
@@ -885,7 +881,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.results_streams,  self.video_mode,machine=self.machine, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, results_stream=self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
