@@ -603,10 +603,10 @@ class OpxFastScanParameter(FastScanParameterBase):
             self,
             scan_config: ScanConfigBase,
             program: Program,
-            machine : QuAM,
             results_stream : qua._dsl._ResultSource,
             video_mode: VideoMode,
             pulse_lib,
+            machine,
             ):
         """
         args:
@@ -885,7 +885,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.results_streams, self.machine, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.results_streams,  self.video_mode,machine=self.machine, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
