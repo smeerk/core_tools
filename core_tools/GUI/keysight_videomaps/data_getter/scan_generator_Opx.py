@@ -643,6 +643,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         # play sequence
         job = self.video_mode.execute(self.program)
         res = job.result_handles
+        print(res)
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
 
         for stream_name, stream in self.results_stream.items():
