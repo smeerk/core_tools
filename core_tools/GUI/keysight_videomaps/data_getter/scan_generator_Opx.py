@@ -603,6 +603,8 @@ class OpxFastScanParameter(FastScanParameterBase):
             self,
             scan_config: ScanConfigBase,
             program: Program,
+            machine : QuAM,
+            results_stream : qua._dsl._ResultSource,
             video_mode: VideoMode,
             pulse_lib,
             ):
@@ -612,6 +614,8 @@ class OpxFastScanParameter(FastScanParameterBase):
             pulse_sequence (sequencer) : sequence of the 1D scan
         """
         self.pulse_lib = pulse_lib
+        self.machine = machine
+        self.results_stream = results_stream
         self.video_mode = video_mode
         self.program = program
         self._recompile_requested = False
@@ -627,6 +631,12 @@ class OpxFastScanParameter(FastScanParameterBase):
         Returns:
             dictionary with per channel real or complex data in 1D ndarray.
         """
+
+        stream_names = []
+
+        for resonator in self.machine.resonators.values():
+            stream_names.append(f"{resonator.id}_I")
+
         if self._recompile_requested:
             self._recompile_requested = False
             start = time.perf_counter()
@@ -639,7 +649,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         job = self.video_mode.execute(self.program)
         res = job.result_handles
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
-        raw = res.adc_results.fetch_all()
+        raw = res.stream_names[0].fetch_all()
 
         return raw
     
@@ -875,7 +885,7 @@ class FastScanGenerator(FastScanGeneratorBase):
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.results_streams, self.machine, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
 
 
     def create_2D_scan(
