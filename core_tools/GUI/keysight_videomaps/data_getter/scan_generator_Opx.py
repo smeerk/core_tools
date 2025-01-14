@@ -651,6 +651,8 @@ class OpxFastScanParameter(FastScanParameterBase):
             raw[stream_name] = stream_handle.fetch_all()
             print(raw[stream_name])
 
+        print(job.execution_report())
+
         return raw
     
     def close(self):
