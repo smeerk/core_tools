@@ -15,7 +15,6 @@ import numpy.typing as npt
 from qualang_tools.results import fetching_tool
 from qm import QuantumMachinesManager
 from qm import qua
-from qm.qua._dsl import _ResultsStream
 
 # from qm.QuantumMachinesManager import QuantumMachine
 from quam.core import QuamRoot, quam_dataclass
