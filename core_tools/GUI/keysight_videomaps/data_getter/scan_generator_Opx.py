@@ -647,11 +647,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
 
         for stream_name, stream in self.results_stream.items():
-            print(stream_name)
-            print(type(stream_name))
-            print(stream)
-            print(type(stream))
-            raw[stream_name] = res.stream_name.fetch_all()
+            raw[stream_name] = res.stream.fetch_all()
 
         return raw
     
