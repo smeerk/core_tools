@@ -827,8 +827,9 @@ class FastScanGenerator(FastScanGeneratorBase):
 
         self.qm = self.qmm.open_qm(self.machine.generate_config())
 
-        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
         self.setup_measurements(t_measure)
+        self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
+        
 
         with qua.program() as program:
             point_counter = qua.declare(int)
