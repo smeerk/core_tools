@@ -649,6 +649,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         for stream_name, stream in self.results_stream.items():
             stream_handle = res.get(stream_name)
             raw[stream_name] = stream_handle.fetch_all()
+            print(raw[stream_name])
 
         return raw
     
