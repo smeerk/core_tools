@@ -825,7 +825,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             self.gates, self.virtual_gates, self.resonators, self.resonator_time_of_flight
         )
 
-        self.setup_measurements(t_measure)
+        self.setup_measurements(int(t_measure*1000))
         self.qm = self.qmm.open_qm(self.machine.generate_config())
 
         self.video_mode = self.setup_video_mode_1d(self.qm, swing, n_pt, self.virtual_gates[virtual_gate], self.dividers, dimension=1)
