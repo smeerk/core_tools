@@ -672,7 +672,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             ],
         ] = {"resonator": ("con1", 1, 1, 176553106, 0.1, 0.0)},
         resonator_time_of_flight: int = 400,
-        qm=None,  # TODO add type
+        qmm=None,  # TODO add type
         testing: bool = False,
         wait_before_acq=500,
     ):
@@ -681,7 +681,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             gates, virtual_gates, resonators, resonator_time_of_flight
         )
 
-        self.qm = qm
+        self.qm = qmm.open_qm(self.machine.generate_config())
         self.gates = gates
         self.dividers = [gate[2] for gate in gates.values()]
         self.virtual_gates = virtual_gates
