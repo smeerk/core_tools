@@ -634,8 +634,8 @@ class OpxFastScanParameter(FastScanParameterBase):
 
         stream_names = []
 
-        for resonator in self.machine.resonators.values():
-            stream_names.append(f"{resonator.id}_I")
+        for res_name, resonator in self.machine.resonators.items():
+            stream_names.append(f"{res_name}_I")
 
         if self._recompile_requested:
             self._recompile_requested = False
