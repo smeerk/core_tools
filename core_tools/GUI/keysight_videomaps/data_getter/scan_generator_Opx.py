@@ -645,7 +645,7 @@ class OpxFastScanParameter(FastScanParameterBase):
         # play sequence
         job = self.video_mode.execute(self.program)
         res = job.result_handles
-        print(f"resutl handel ={res}")
+        # print(f"resutl handel ={res}")
         logger.debug(f'Play {(time.perf_counter()-start)*1000:3.1f} ms')
 
         for stream_name, stream in self.results_stream.items():
@@ -656,7 +656,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             last_streamed = np.array(last_streamed_temp[-1].item(0))
             raw[stream_name] = last_streamed
 
-        print(job.execution_report())
+        # print(job.execution_report())
 
         return raw
     
@@ -797,7 +797,7 @@ class FastScanGenerator(FastScanGeneratorBase):
     ):
         result_streams = {}
         for resonator in self.machine.resonators.values():
-            print(f"resonator id = {resonator.id}")
+            # print(f"resonator id = {resonator.id}")
             result_streams[f"{resonator.id}_I"] = qua.declare_stream()
 
         return result_streams
@@ -809,7 +809,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             qua.wait(self.wait_before_acq // 4, *self.machine.resonators)
         for res_name, resonator in self.machine.resonators.items():
             I_val, Q_val = resonator.measure("readout")
-            print(f"I_val={I_val}")
+            # print(f"I_val={I_val}")
             qua.save(I_val, self.results_streams[f"{res_name}_I"])
 
     def create_1D_scan(
