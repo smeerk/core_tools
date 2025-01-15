@@ -650,6 +650,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             stream_handle = res.get(stream_name)
             raw[stream_name] = stream_handle.fetch_all()
             print(raw[stream_name])
+            print(stream_handle)
 
         print(job.execution_report())
 
@@ -803,6 +804,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             qua.wait(self.wait_before_acq // 4, *self.machine.resonators)
         for res_name, resonator in self.machine.resonators.items():
             I_val, Q_val = resonator.measure("readout")
+            print(I_val)
             qua.save(I_val, self.results_streams[f"{res_name}_I"])
 
     def create_1D_scan(
