@@ -915,11 +915,17 @@ class FastScanGenerator(FastScanGeneratorBase):
             virtual_gate1, swing1, n_pt1,
             virtual_gate2, swing2, n_pt2,
             t_measure, pulse_gates, biasT_corr)
+
+        self.machine = make_quam(
+            self.gates, self.virtual_gates, self.resonators, self.resonator_time_of_flight
+        )
         
+        self.setup_measurements(int(t_measure))
+        self.qm = self.qmm.open_qm(self.machine.generate_config())
+
         self.video_mode = self.setup_video_mode_2d(
             self.qm, swing1, n_pt1, swing2, n_pt2, self.virtual_gates[virtual_gate1], self.virtual_gates[virtual_gate2], self.dividers, dimension=2
         )
-        self.setup_measurements(t_measure)
 
         with qua.program() as program:
             point_counter1 = qua.declare(int)
@@ -969,9 +975,9 @@ class FastScanGenerator(FastScanGeneratorBase):
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    stream.save_all(stream_name)
+                    stream.buffer(n_pt1,n_pt2).save_all(stream_name)
 
         if self.testing:
             return program
         
-        return OpxFastScanParameter(config, program, self.video_mode, pulse_lib=self.pulse_lib) # what should be returned here?
+        return OpxFastScanParameter(config, program, self.video_mode, results_stream= self.results_streams, pulse_lib=self.pulse_lib) # what should be returned here?
