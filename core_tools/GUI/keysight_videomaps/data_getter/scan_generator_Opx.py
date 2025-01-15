@@ -886,7 +886,7 @@ class FastScanGenerator(FastScanGeneratorBase):
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
                     # stream.save(stream_name)
-                    stream.save_all(stream_name)
+                    stream.buffer(n_pt).save_all(stream_name)
 
         if self.testing:
             return program
