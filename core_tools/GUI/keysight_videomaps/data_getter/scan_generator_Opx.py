@@ -937,10 +937,10 @@ class FastScanGenerator(FastScanGeneratorBase):
             with qua.infinite_loop_():
 
                 with qua.for_(
-                    point_counter1, 0, point_counter1 < n_pt1, point_counter1 + 1
-                ):
+                    point_counter2, 0, point_counter2 < n_pt2, point_counter2 + 1
+                ): # looping over npt2 outside to match with other scan generators
                     with qua.for_(
-                        point_counter2, 0, point_counter2 < n_pt2, point_counter2 + 1
+                        point_counter1, 0, point_counter1 < n_pt1, point_counter1 + 1
                     ):
                         if self.testing:
                             self.set_gates_dc(
@@ -968,13 +968,13 @@ class FastScanGenerator(FastScanGeneratorBase):
                                     for gate in self.gates
                                 ]
                             )
-                        self.measurement_macro()
+                        self.measurement_macro() 
 
                 self.set_gates_dc([0 for _ in self.gates])
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    stream.buffer(n_pt1,n_pt2).save(stream_name)
+                    stream.buffer(n_pt1,n_pt2).save(stream_name) # not sure if it will be saved in the correct order
 
         if self.testing:
             return program
