@@ -654,7 +654,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             # print(raw[stream_name])
             # print(f"stream_name = {stream_name}")
             last_streamed = np.array(last_streamed_temp[-1].item(0))
-            raw[stream_name] = last_streamed
+            raw[stream_name] = last_streamed_temp
 
         # print(job.execution_report())
 
@@ -889,7 +889,7 @@ class FastScanGenerator(FastScanGeneratorBase):
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    stream.buffer(n_pt).save_all(stream_name)
+                    stream.buffer(n_pt).save(stream_name)
 
         if self.testing:
             return program
@@ -974,7 +974,7 @@ class FastScanGenerator(FastScanGeneratorBase):
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    stream.buffer(n_pt1,n_pt2).save_all(stream_name)
+                    stream.buffer(n_pt1,n_pt2).save(stream_name)
 
         if self.testing:
             return program
