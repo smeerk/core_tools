@@ -654,7 +654,7 @@ class OpxFastScanParameter(FastScanParameterBase):
             # print(f"stream_name = {stream_name}")
             # last_streamed = np.array(last_streamed_temp[-1].item(0))
             raw[stream_name] = last_streamed_temp
-            print(raw[stream_name])
+            # print(raw[stream_name])
 
         # print(job.execution_report())
 
