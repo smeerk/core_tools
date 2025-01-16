@@ -716,15 +716,15 @@ class FastScanGenerator(FastScanGeneratorBase):
             qua.play(pulses.ConstantPulse(gate_val), self.machine.gates[gate_name])
 
     def calc_steps_1d(self, swing, n_pt, virtual_gate, dividers):
-        value = swing * np.array(virtual_gate) * dividers
+        value = swing * np.array(virtual_gate) * dividers * 0.001
         big_step = -value
         small_step = 2 * value / (n_pt - 1)
         return big_step, small_step
 
 
     def calc_steps_2d(self, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
-        value1 = swing1 * np.array(virtual_gate1) * dividers
-        value2 = swing2 * np.array(virtual_gate2) * dividers
+        value1 = swing1 * np.array(virtual_gate1) * dividers * 0.001
+        value2 = swing2 * np.array(virtual_gate2) * dividers * 0.001
         big_step1 = -value1
         big_step2 = -value2
         small_step1 = 2 * value1 / (n_pt1 - 1)
@@ -889,8 +889,7 @@ class FastScanGenerator(FastScanGeneratorBase):
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    # stream.save(stream_name)
-                    stream.buffer(n_pt).save_all(stream_name)
+                    stream.buffer(n_pt).save(stream_name)
 
         if self.testing:
             return program
@@ -975,7 +974,7 @@ class FastScanGenerator(FastScanGeneratorBase):
 
             with qua.stream_processing():
                 for stream_name, stream in self.results_streams.items():
-                    stream.buffer(n_pt1,n_pt2).save_all(stream_name)
+                    stream.buffer(n_pt1,n_pt2).save(stream_name)
 
         if self.testing:
             return program
