@@ -651,10 +651,10 @@ class OpxFastScanParameter(FastScanParameterBase):
         for stream_name, stream in self.results_stream.items():
             stream_handle = res.get(stream_name)
             last_streamed_temp = stream_handle.fetch_all()
-            # print(raw[stream_name])
             # print(f"stream_name = {stream_name}")
             # last_streamed = np.array(last_streamed_temp[-1].item(0))
             raw[stream_name] = last_streamed_temp
+            print(raw[stream_name])
 
         # print(job.execution_report())
 
