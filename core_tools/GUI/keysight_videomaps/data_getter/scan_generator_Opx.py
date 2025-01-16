@@ -716,15 +716,15 @@ class FastScanGenerator(FastScanGeneratorBase):
             qua.play(pulses.ConstantPulse(gate_val), self.machine.gates[gate_name])
 
     def calc_steps_1d(self, swing, n_pt, virtual_gate, dividers):
-        value = swing * np.array(virtual_gate) * dividers * 0.001
-        big_step = -value
-        small_step = 2 * value / (n_pt - 1)
+        value = swing * np.array(virtual_gate) * dividers
+        big_step = -value/1000
+        small_step = 2 * value / (n_pt - 1)/1000
         return big_step, small_step
 
 
     def calc_steps_2d(self, swing1, n_pt1, swing2, n_pt2, virtual_gate1, virtual_gate2, dividers):
-        value1 = swing1 * np.array(virtual_gate1) * dividers * 0.001
-        value2 = swing2 * np.array(virtual_gate2) * dividers * 0.001
+        value1 = swing1 * np.array(virtual_gate1) * dividers /1000
+        value2 = swing2 * np.array(virtual_gate2) * dividers /1000
         big_step1 = -value1
         big_step2 = -value2
         small_step1 = 2 * value1 / (n_pt1 - 1)
